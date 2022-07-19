@@ -53,13 +53,13 @@ def slugify(value, allow_unicode=False):
         value = re.sub(r"[^\w\s-]", "", value.lower())
         return re.sub(r"[-\s]+", "-", value).strip("-_")
 
+
 def load_metadata():
     meta = {}
     for key, meta_file in {
         "topics": "Topic.csv", 
         "variables": "Variable.csv", 
-        "classifications": 
-        "Classification.csv", 
+        "classifications": "Classification.csv",
         "categories": "Category.csv"
     }.items():
         with open(meta_file, 'r', encoding='utf-8-sig') as f:
