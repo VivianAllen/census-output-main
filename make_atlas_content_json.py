@@ -19,8 +19,17 @@ COMPARISON_2011_COLUMN = "2011 comparability?"
 
 NON_ENTITIES = ("return to index", "does not apply")
 
-def norm_string(string):
-    return string.lower().strip()
+
+# ==================================================== UTILITIES ===================================================== #
+
+
+def cmp_strings(str1, str2):
+    return str1.lower().strip() == str2.lower().strip()
+
+
+def cmp_string_to_list(string, strList):
+    return any(cmp_strings(string, str2) for str2 in strList)
+
 
 def slugify(value, allow_unicode=False):
         """
@@ -91,10 +100,8 @@ def worksheet_to_row_dicts(ws):
 
 def get_topic_content(name_or_mnemonic, metadata):
     topic_metadata = [
-        m for m in metadata["topics"] if norm_string(name_or_mnemonic) in (
-            norm_string(m["Topic_Mnemonic"]),
-            norm_string(m["Topic_Description"]), 
-            norm_string(m["Topic_Title"]),
+        m for m in metadata["topics"] if cmp_string_to_list(
+            name_or_mnemonic, (m["Topic_Mnemonic"], m["Topic_Description"], m["Topic_Title"])
         )
     ]
     if topic_metadata:
@@ -152,13 +159,13 @@ def get_variable(wb, metadata, config_row):
 
 
 def get_variable_content(code, metadata):
-    var_metadata = [m for m in metadata["variables"] if norm_string(code) == norm_string(m["Variable_Mnemonic"])]
+    var_metadata = [m for m in metadata["variables"] if cmp_strings(code, m["Variable_Mnemonic"])]
     if var_metadata:
         var_name = var_metadata[0]["Variable_Title"].strip()
         var_desc = var_metadata[0]["Variable_Description"].strip()
         var_units = var_metadata[0]["Statistical_Unit"].strip()
     else:
-        var_name = norm_string(code).replace("_", " ").title()
+        var_name = code.replace("_", " ").strip().title()
         var_desc = "not found in variable metadata!"
         var_units = "not found in variable metadata!"
         print(f"No metadata found for variable {code}")
@@ -201,7 +208,7 @@ def get_classifications(wb, metadata, variable, config_row):
 
 def get_classification_content(code, metadata):
     code = code.replace(" ", "")
-    class_metadata = [m for m in metadata["classifications"] if norm_string(code) == norm_string(m["Classification_Mnemonic"])]
+    class_metadata = [m for m in metadata["classifications"] if cmp_strings(code, m["Classification_Mnemonic"])]
     if class_metadata:
         class_desc = class_metadata[0]["External_Classification_Label_English"].strip()
     else:
@@ -235,7 +242,7 @@ def get_categories(ws, cat_q_codes_col, cat_name_col, metadata, config_row):
 
 
 def norm_cat_q_codes(cat_q_code_str):
-    cat_q_code_str = str(cat_q_code_str).replace(" ", "")
+    cat_q_code_str = "".join(str(cat_q_code_str).split())
     for to_replace in ("–", ">"):
         cat_q_code_str = cat_q_code_str.replace(to_replace, "-")
     return cat_q_code_str
