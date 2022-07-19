@@ -9,6 +9,10 @@ from openpyxl import load_workbook
 
 WORKBOOK_FILENAME = "Output_Category_Mapping_2021.xlsx"
 SELECTED_TABLES_CSV = "selected-tables.csv"
+NON_ENTITIES = ("return to index", "does not apply")
+VARIABLE_OVERRIDES = {
+    "DWELLING_HMO_UNRELATED (WAS HH_MULTI_OCCUPANCY)": "DWELLING_HMO_UNRELATED"
+}
 
 def expand_range(code, sep):
     endpoints = code.split(sep)
@@ -48,7 +52,7 @@ def extract_categories(sheet, column):
     row = 2
     while row < 1000:
         val = sheet.cell(row, column).value
-        if re.search('^[-0-9]', str(val)):
+        if re.search('^[-0-9]', str(val)) and sheet.cell(row, column + 1).value.lower() not in NON_ENTITIES:
             codes_str = str(val).strip().replace(" ", "")
             codes = parse_category_codes(val)
             categories.append({
@@ -80,7 +84,7 @@ def parse_sheet(sheet, var_details_map, selected_vars):
     selected_default = False
 
     for cell in rows[0]:
-        if isinstance(cell.value, str) and re.search('[A-Z]', cell.value):
+        if isinstance(cell.value, str) and re.search('[A-Z]', cell.value) and cell.value.lower() not in NON_ENTITIES:
             short_category_code = cell.value.strip().split("_")[-1]
             if selected_categories[0] == "all" or short_category_code in selected_categories:
                 classification = extract_categories(sheet, cell.column)
@@ -124,7 +128,7 @@ def parse_index_table(sheet):
                 sheet_name = value
                 if sheet.cell(row, column).hyperlink is not None:
                     sheet_name = sheet.cell(row, column).hyperlink.location.split('!')[0].upper().replace("'", "")
-                d = {}
+                d = {"variable_name": sheet_name}
                 var_details_map[sheet_name] = d
             d[column_name] = value
         row += 1
@@ -147,7 +151,6 @@ def main():
     selected_tables_csv = sys.argv[2] or SELECTED_TABLES_CSV
 
     selected_vars = parse_selected_vars(selected_tables_csv)
-
     wb = load_workbook(workbook_filename)
     sheetnames = wb.sheetnames
 
@@ -161,7 +164,8 @@ def main():
         if var_data is not None:
             variables.append(var_data)
 
-    print(json.dumps(variables, indent=4))
+    with open(sys.argv[3], "w") as f:
+        json.dump(variables, f, indent=4)
     #print(len(variables))
     #print(sum(len(v["classifications"]) for v in variables))
 

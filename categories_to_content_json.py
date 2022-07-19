@@ -22,7 +22,6 @@ def summarise_category(category):
         "category_h_pt3": "TODO",
     }
 def summarise_classification(classification, additional_metadata):
-    print(classification["classification_code"])
     additional_classification_metadata = next(
         filter(lambda x: x["Classification_Mnemonic"] == classification["classification_code"].lower(), additional_metadata["classifications"])
     )
@@ -105,7 +104,8 @@ def main():
         }
         for topic in topics
     ]
-    print(json.dumps(result, indent=4))
+    with open(sys.argv[2], "w") as f:
+        json.dump(result, f)
 
 if __name__=="__main__":
     main()
