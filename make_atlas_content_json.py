@@ -155,12 +155,14 @@ def get_classifications(wb, metadata, variable, config_row):
         required_class = required_class_str.split(",")
         class_to_process = [c for c in all_class_in_worksheet if any(c.endswith(rc) for rc in required_class)]
     
-    class_data_cols_index = [{"code": c, "cat_code_col": i, "cat_name_col": i+1} for i, c in enumerate(col_headers) if c in class_to_process]
+    class_data_cols_index = [{"code": c, "cat_q_codes_col": i, "cat_name_col": i+1} for i, c in enumerate(col_headers) if c in class_to_process]
     classifications = []
     for c in class_data_cols_index:
         class_content = get_classification_content(c["code"], metadata)
+        class_content["categories"] = get_categories(class_worksheet, c["cat_q_codes_col"], c["cat_name_col"], metadata, config_row)
         classifications.append(class_content)
     return classifications
+
 
 def get_classification_content(code, metadata):
     code = code.replace(" ", "")
@@ -176,6 +178,39 @@ def get_classification_content(code, metadata):
         "desc": class_desc,
         "categories": []
     }
+
+
+# ================================================ CATEGORY PROCESSING =============================================== #
+
+
+def get_categories(ws, cat_q_codes_col, cat_name_col, metadata, config_row):
+    cat_q_codes = [norm_cat_q_codes(cell.value) for cell in list(ws.columns)[cat_q_codes_col] if is_bordered_cell(cell)]
+    cat_names = [cell.value for cell in list(ws.columns)[cat_name_col] if is_bordered_cell(cell)]
+    categories = []
+    for q_codes, name  in zip(cat_q_codes, cat_names,):
+        categories.append(
+            {
+                "name": name,
+                "slug": slugify(name),
+                "code": make_cat_code(q_codes, name)
+            }
+        )
+    return categories
+
+
+def norm_cat_q_codes(cat_q_code_str):
+    cat_q_code_str = str(cat_q_code_str).replace(" ", "")
+    for to_replace in ("–", ">"):
+        cat_q_code_str = cat_q_code_str.replace(to_replace, "-")
+    return cat_q_code_str
+
+
+def is_bordered_cell(cell):
+    return cell.border.left.style is not None and cell.border.right.style is not None
+
+
+def make_cat_code(cat_q_codes, cat_name):
+    return f"{cat_name}={cat_q_codes}" 
 
 
 # ======================================================= MAIN ======================================================= #
