@@ -9,14 +9,15 @@ import unicodedata
 
 from openpyxl import load_workbook
 
-
-
-
 CONFIG_WORKSHEET = "INDEX-filtered"
 TOPIC_NAME_COLUMN = "Topic Area(s)"
 VARIABLE_CODE_COLUMN = "2021 Mnemonic (variable)"
 CLASS_TO_KEEP_COLUMN = "Classifications to keep"
+DEFAULT_CLASS_COLUMN = "Default classification"
+DOT_DENSITY_CLASS_COLUMN = "Dot density classification"
+COMPARISON_2011_COLUMN = "2011 comparability?"
 
+NON_ENTITIES = ("return to index", "does not apply")
 
 def norm_string(string):
     return string.lower().strip()
@@ -85,7 +86,7 @@ def worksheet_to_row_dicts(ws):
     rows = ws.rows
     header_row = next(rows)
     colnames = [cell.value for cell in header_row]
-    return [dict(zip(colnames, row)) for row in rows]
+    return [dict(zip(colnames, row)) for row in rows if not all (c.value == None for c in row)]
 
 
 def get_topic_content(name_or_mnemonic, metadata):
@@ -121,6 +122,32 @@ def get_variable(wb, metadata, config_row):
     var_code_from_hyperlink = var_code_cell.hyperlink.location.split('!')[0].replace("'", "")
     variable_content = get_variable_content(var_code_from_hyperlink, metadata)
     variable_content["classifications"] = get_classifications(wb, metadata, variable_content, config_row)
+    
+    default_class_suffix = config_row[DEFAULT_CLASS_COLUMN].value.replace("(only one classification)", "").strip()
+    default_class = class_code_from_suffix(variable_content["classifications"], default_class_suffix)
+    if default_class:
+        variable_content["default_classification"] = default_class[0]
+    else:
+        variable_content["default_classification"] = "not found in variables!"
+        print(f"Default classification {default_class_suffix} could not be found in for variable {variable_content['code']}")
+    
+    dot_density_class_suffix = config_row[DOT_DENSITY_CLASS_COLUMN].value.strip()
+    if dot_density_class_suffix.lower() == "no":
+        variable_content["dot_density_classification"] = "false"
+    else:
+        dot_density_class = class_code_from_suffix(variable_content["classifications"], dot_density_class_suffix)
+        if dot_density_class:
+            variable_content["dot_density_classification"] = dot_density_class[0]
+        else:
+            variable_content["dot_density_classification"] = "not found in variables!"
+            print(f"Dot density classification {dot_density_class_suffix} could not be found in for variable {variable_content['code']}")
+
+    comp_2011 = config_row[COMPARISON_2011_COLUMN].value
+    if comp_2011:
+        variable_content["2011_comparison"] = comp_2011.replace("no", "false").replace("yes", "true")
+    else:
+        variable_content["2011_comparison"] = "false"
+
     return variable_content
 
 
@@ -129,17 +156,24 @@ def get_variable_content(code, metadata):
     if var_metadata:
         var_name = var_metadata[0]["Variable_Title"].strip()
         var_desc = var_metadata[0]["Variable_Description"].strip()
+        var_units = var_metadata[0]["Statistical_Unit"].strip()
     else:
         var_name = norm_string(code).replace("_", " ").title()
         var_desc = "not found in variable metadata!"
+        var_units = "not found in variable metadata!"
         print(f"No metadata found for variable {code}")
     return {
         "name": var_name,
         "code": code,
         "slug": slugify(var_name),
         "desc": var_desc,
+        "units": var_units,
         "classifications": []
     }
+
+
+def class_code_from_suffix(classifications, suffix):
+    return [c["code"] for c in classifications if c["code"].lower().endswith(suffix.lower())]
 
 
 # ============================================ CLASSIFICATION PROCESSING ============================================= #
@@ -147,12 +181,13 @@ def get_variable_content(code, metadata):
 def get_classifications(wb, metadata, variable, config_row):
     class_worksheet = wb[variable["code"]]
     col_headers = [cell.value for cell in next(class_worksheet.rows)]
-    all_class_in_worksheet = [h for h in col_headers if isinstance(h, str)]
+    all_class_in_worksheet = [h for h in col_headers if isinstance(h, str) and h.lower() not in NON_ENTITIES]
+
     required_class_str = config_row[CLASS_TO_KEEP_COLUMN].value
     if required_class_str == "all":
         class_to_process = all_class_in_worksheet
     else:
-        required_class = required_class_str.split(",")
+        required_class = [x.strip() for x in required_class_str.split(",")]
         class_to_process = [c for c in all_class_in_worksheet if any(c.endswith(rc) for rc in required_class)]
     
     class_data_cols_index = [{"code": c, "cat_q_codes_col": i, "cat_name_col": i+1} for i, c in enumerate(col_headers) if c in class_to_process]
@@ -187,14 +222,15 @@ def get_categories(ws, cat_q_codes_col, cat_name_col, metadata, config_row):
     cat_q_codes = [norm_cat_q_codes(cell.value) for cell in list(ws.columns)[cat_q_codes_col] if is_bordered_cell(cell)]
     cat_names = [cell.value for cell in list(ws.columns)[cat_name_col] if is_bordered_cell(cell)]
     categories = []
-    for q_codes, name  in zip(cat_q_codes, cat_names,):
-        categories.append(
-            {
-                "name": name,
-                "slug": slugify(name),
-                "code": make_cat_code(q_codes, name)
-            }
-        )
+    for q_codes, name  in zip(cat_q_codes, cat_names):
+        if name.lower() not in NON_ENTITIES:
+            categories.append(
+                {
+                    "name": name,
+                    "slug": slugify(name),
+                    "code": make_cat_code(q_codes, name)
+                }
+            )
     return categories
 
 
@@ -210,7 +246,7 @@ def is_bordered_cell(cell):
 
 
 def make_cat_code(cat_q_codes, cat_name):
-    return f"{cat_name}={cat_q_codes}" 
+    return f"{slugify(cat_name)}={cat_q_codes}" 
 
 
 # ======================================================= MAIN ======================================================= #
@@ -220,7 +256,6 @@ def main():
     wb = load_workbook(workbook_filename)
     metadata = load_metadata()
     topics = get_topics(wb, metadata)
-    # variable_list = index_worksheet_to_variable_list(wb)
     with open(sys.argv[2], "w") as f:
         json.dump(topics, f, indent=4)
 
