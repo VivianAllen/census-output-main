@@ -17,7 +17,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 # ====================================================== CONFIG ====================================================== #
 
 
-# csv files from sharepoint with descriptions, units etc for all topics, var_metadatas, clasifications & categories
+# csv files from sharepoint with descriptions, units etc for all topics, variables, clasifications & categories
 METADATA_FILES = {
     "topics": "Topic.csv",
     "variables": "Variable.csv",
@@ -27,32 +27,32 @@ METADATA_FILES = {
 # csv file encoding. NB - might want to check this if you get weird characters in the metadata output
 METADATA_FILE_ENCODING = "utf-8-sig'"
 
-# The name of the sheet in the Output_Category_Mapping excel workbook with the var_metadatas to process and the additional
+# The name of the sheet in the Output_Category_Mapping excel workbook with the variables to process and the additional
 # config required to process them into atlas content files.
 CONFIG_WORKSHEET = "INDEX-filtered"
 
-# The column name (assumed to be first row) in the index page which specifies the topic each var_metadata belongs to
+# The column name (assumed to be first row) in the index page which specifies the topic each variable belongs to
 TOPIC_NAME_COLUMN = "Topic Area(s)"
 
-# The column name (assumed to be first row) in the index page which contains within-sheet hyperlinks to var_metadata sheets
+# The column name (assumed to be first row) in the index page which contains within-sheet hyperlinks to variable sheets
 # to be included (e.g. Accommodation_Type, which links to the ACCOMODATION_TYPE worksheet). NB - all values in here that
-# are NOT hyperlinks will not currently be processed, as they are assumed to refer to var_metadatas that are not
+# are NOT hyperlinks will not currently be processed, as they are assumed to refer to variables that are not
 # defined in the Output_Category_Mapping excel workbook.
 VAR_HYPERLINK_COLUMN = "2021 Mnemonic (variable)"
 
-# The column name (assumed to be first row) that lists the classifications from each var_metadata that are to be included.
+# The column name (assumed to be first row) that lists the classifications from each variable that are to be included.
 # This can be either a single value (e.g. 2A), a comma-seperated list (e.g 2A, 4A, 5A) or 'all' (all defined
 # classifications will be included.)
 CLASSIFICATIONS_TO_INCLUDE_COLUMN = "Classifications to keep"
 
-# The column name (assumed to be first row) that defines the default classification to be used for each var_metadata.
+# The column name (assumed to be first row) that defines the default classification to be used for each variable.
 DEFAULT_CLASS_COLUMN = "Default classification"
 
-# The column name (assumed to be first row) that defines the classification for each var_metadata that can be represented
+# The column name (assumed to be first row) that defines the classification for each variable that can be represented
 # as a dot density map
 DOT_DENSITY_CLASS_COLUMN = "Dot density classification"
 
-# The column name (assumed to be first row) that flags if this var_metadata has comparison data from the previus 2011 census
+# The column name (assumed to be first row) that flags if this variable has comparison data from the previus 2011 census
 COMPARISON_2011_COLUMN = "2011 comparability?"
 
 # Values that are often found in the same place as data but are not data, and so shouldn't be included.
@@ -230,7 +230,7 @@ def get_topics(wb: Workbook, metadata: dict) -> AllTopics:
             continue
         topic_metadata = get_topic_metadata(name_mnemonic_or_title, metadata)
 
-        # each topic row is also a var_metadata row, so get var_metadata info here
+        # each topic row is also a variable row, so get variable info here
         topic_variable = get_variable(wb, cr, metadata)
 
         # add this topic if we've not seen it before...
@@ -244,7 +244,7 @@ def get_topics(wb: Workbook, metadata: dict) -> AllTopics:
                     variables=[topic_variable]
                 )
             )
-        # ...otherwise if we have seen it before, add its var_metadata to the existing topic
+        # ...otherwise if we have seen it before, add its variable to the existing topic
         else:
             topic = next(
                 filter(lambda t: topic_metadata["name"] == t.name, topics))
@@ -314,7 +314,7 @@ def get_variable_code(config_row: dict) -> str or None:
     var_code_cell = config_row[VAR_HYPERLINK_COLUMN]
     if var_code_cell.hyperlink is None:
         print(
-            f"Ignoring var_metadata {var_code_cell.value} as it does not link to a variable in spreadsheet.")
+            f"Ignoring variable {var_code_cell.value} as it does not link to a variable in spreadsheet.")
         return None
     return var_code_cell.hyperlink.location.split('!')[0].replace("'", "")
 
