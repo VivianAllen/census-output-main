@@ -13,6 +13,7 @@ from openpyxl.cell.cell import Cell
 from openpyxl.workbook.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
+
 # ====================================================== CONFIG ====================================================== #
 
 
@@ -95,6 +96,7 @@ class CensusClassification:
             output_params["dot_density_default"] = self.dot_density_default
         output_params["categories"] = [c.to_json() for c in self.categories]
         return output_params
+
 
 @dataclass
 class CensusVariable:
@@ -495,6 +497,7 @@ def make_cat_code(cat_name, cat_codes):
 
 
 # ======================================================= MAIN ======================================================= #
+
 
 def main():
     workbook_filename = sys.argv[1]
