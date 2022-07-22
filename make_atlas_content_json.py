@@ -79,16 +79,22 @@ class CensusClassification:
     code: str
     slug: str
     desc: str
+    chorolpleth_default: bool
+    dot_density_default: bool
     categories: list[CensusCategory]
 
     def to_json(self):
-        return {
+        output_params = {
             "code": self.code,
             "slug": self.slug,
-            "desc": self.desc,
-            "categories": [c.to_json() for c in self.categories]
+            "desc": self.desc
         }
-
+        if self.chorolpleth_default:
+            output_params["chorolpleth_default"] = self.chorolpleth_default
+        if self.dot_density_default:
+            output_params["dot_density_default"] = self.dot_density_default
+        output_params["categories"] = [c.to_json() for c in self.categories]
+        return output_params
 
 @dataclass
 class CensusVariable:
@@ -341,38 +347,13 @@ def class_code_from_suffix(classifications, suffix):
 
 # ============================================ CLASSIFICATION PROCESSING ============================================= #
 
-    # default_class_suffix = config_row[DEFAULT_CLASS_COLUMN].value.replace("(only one classification)", "").strip()
-    # default_class = class_code_from_suffix(var_metadata["classifications"], default_class_suffix)
-    # if default_class:
-    #     var_metadata["default_classification"] = default_class[0]
-    # else:
-    #     var_metadata["default_classification"] = "not found in var_metadatas!"
-    #     print(f"Default classification {default_class_suffix} could not be found in for var_metadata {var_metadata['code']}")
-
-    # dot_density_class_suffix = config_row[DOT_DENSITY_CLASS_COLUMN].value.strip()
-    # if dot_density_class_suffix.lower() == "no":
-    #     var_metadata["dot_density_classification"] = "false"
-    # else:
-    #     dot_density_class = class_code_from_suffix(var_metadata["classifications"], dot_density_class_suffix)
-    #     if dot_density_class:
-    #         var_metadata["dot_density_classification"] = dot_density_class[0]
-    #     else:
-    #         var_metadata["dot_density_classification"] = "not found in var_metadatas!"
-    #         print(f"Dot density classification {dot_density_class_suffix} could not be found in for var_metadata {var_metadata['code']}")
-
-    # comp_2011 = config_row[COMPARISON_2011_COLUMN].value
-    # if comp_2011:
-    #     var_metadata["2011_comparison"] = comp_2011.replace("no", "false").replace("yes", "true")
-    # else:
-    #     var_metadata["2011_comparison"] = "false"
-
 
 def get_required_classifications(cls_ws: Worksheet, config_row: dict, metadata: dict):
     """
     To parse required classifications from the cls_ws worksheet, first get_classification_column_indices, then 
     filter_required_classifications to only those required in the config_row, then for each required classification,
-    then convert the cls_ws.columns generator into an indexable list and get_classification_metadata and then 
-    get_categories from those columns containing classification info.
+    then convert the cls_ws.columns generator into an indexable list and get_classification_metadata, 
+    get_classification_visualisation_flags, and then get_categories from those columns containing classification info.
     """
     cls_col_indices = get_classification_column_indices(cls_ws)
     required_cls_col_indices = filter_required_classifications(
@@ -381,11 +362,14 @@ def get_required_classifications(cls_ws: Worksheet, config_row: dict, metadata: 
     classifications = []
     for c in required_cls_col_indices:
         cls_metadata = get_classification_metadata(c["cls_code"], metadata)
+        cls_flags = get_classification_visualisation_flags(c["cls_code"], config_row)
         classifications.append(
             CensusClassification(
                 code = cls_metadata["code"],
                 slug = slugify(cls_metadata["code"]),
                 desc = cls_metadata["desc"],
+                chorolpleth_default = cls_flags["chorolpleth_default"],
+                dot_density_default = cls_flags["dot_density_default"],
                 categories = get_categories(cls_ws_cols[c["cat_codes_col"]], cls_ws_cols[c["cat_name_col"]])
             )
         )
@@ -439,6 +423,14 @@ def get_classification_metadata(code: str, metadata: dict) -> dict:
     return {
         "code": code,
         "desc": class_desc,
+    }
+
+def get_classification_visualisation_flags(code: str, config_row: dict) -> dict:
+    default_class_suffix = config_row[DEFAULT_CLASS_COLUMN].value.replace("(only one classification)", "").strip()
+    dot_density_class_suffix = config_row[DOT_DENSITY_CLASS_COLUMN].value.strip()
+    return {
+        "chorolpleth_default": code.endswith(default_class_suffix),
+        "dot_density_default": dot_density_class_suffix.lower() != "no" and code.endswith(dot_density_class_suffix)
     }
 
 
