@@ -55,7 +55,7 @@ DOT_DENSITY_CLASS_COLUMN = "Dot density classification"
 COMPARISON_2011_COLUMN = "2011 comparability?"
 
 # Values that are often found in the same place as data but are not data, and so shouldn't be included.
-NOT_DATA = ("return to index", "does not apply")
+NOT_DATA = ("return to index", "does not apply", "no code required")
 
 
 # ================================================= OUTPUT CLASSES =================================================== #
@@ -125,6 +125,14 @@ class CensusTopic:
             "variables": [v.to_json() for v in self.variables]
         }
 
+@dataclass
+class AllTopics:
+    topics: list[CensusTopic]
+
+    def to_json(self):
+        # NB topics in alphabetical order!
+        return [t.to_json() for t in sorted(self.topics, key = lambda x: x.name)]
+
 
 # ==================================================== UTILITIES ===================================================== #
 
@@ -192,7 +200,7 @@ def worksheet_to_row_dicts(ws: Worksheet) -> list[dict]:
 # ================================================= TOPIC PROCESSING ================================================= #
 
 
-def get_topics(wb: Workbook, metadata: dict) -> list[CensusTopic]:
+def get_topics(wb: Workbook, metadata: dict) -> AllTopics:
     """
     To parse the topics from the wb workbook, first simplify procesing by converting the config worksheet (named in the 
     CONFIG_WORKSHEET constant) to a list of dictionaries keyed to the column headers found in the first row. Then loop 
@@ -234,7 +242,7 @@ def get_topics(wb: Workbook, metadata: dict) -> list[CensusTopic]:
                 filter(lambda t: topic_metadata["name"] == t.name, topics))
             topic.variables.append(topic_variable)
 
-    return topics
+    return AllTopics(topics = topics)
 
 
 def get_topic_metadata(name_mnemonic_or_title: str, metadata: dict) -> dict:
@@ -503,7 +511,7 @@ def main():
     metadata = load_metadata()
     topics = get_topics(wb, metadata)
     with open(output_filename, "w") as f:
-        json.dump([t.to_json() for t in topics], f, indent=4)
+        json.dump(topics.to_json(), f, indent=4)
 
 
 if __name__ == "__main__":
