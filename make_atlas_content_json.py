@@ -325,8 +325,7 @@ def get_variable_metadata(code: str, metadata: dict):
     one in which the mnemonic matches the code arg, then retrieve the variable name, desc, and units from the metadata.
     If not found, substitute with warning string and print warning.
     """
-    var_metadata = [m for m in metadata["variables"]
-                    if cmp_strings(code, m["Variable_Mnemonic"])]
+    var_metadata = [m for m in metadata["variables"] if cmp_strings(code, m["Variable_Mnemonic"])]
     if len(var_metadata) > 0:
         var_name = var_metadata[0]["Variable_Title"].strip()
         var_desc = var_metadata[0]["Variable_Description"].strip()
@@ -341,10 +340,6 @@ def get_variable_metadata(code: str, metadata: dict):
         "desc": var_desc,
         "units": var_units,
     }
-
-
-def class_code_from_suffix(classifications, suffix):
-    return [c["code"] for c in classifications if c["code"].lower().endswith(suffix.lower())]
 
 
 # ============================================ CLASSIFICATION PROCESSING ============================================= #
@@ -427,6 +422,7 @@ def get_classification_metadata(code: str, metadata: dict) -> dict:
         "desc": class_desc,
     }
 
+
 def get_classification_visualisation_flags(code: str, config_row: dict) -> dict:
     default_class_suffix = config_row[DEFAULT_CLASS_COLUMN].value.replace("(only one classification)", "").strip()
     dot_density_class_suffix = config_row[DOT_DENSITY_CLASS_COLUMN].value.strip()
@@ -485,7 +481,7 @@ def get_category_cell_indices(col: tuple[Cell]) -> list[int]:
 def make_cat_code(cat_name, cat_codes):
     """
     To make a unqiue category_code from the cat_name and cat_codes of a category, first normalise the cat_codes 
-    statement to have no whitespace and consist only of numbers, commas and - (with no leading zeroes) then combine with 
+    statement to have no whitespace and consist only of numbers, commas and '-' (with no leading zeroes) then combine with 
     the slugified cat_name, seperated by an =.
     """
     cat_codes = "".join(str(cat_codes).split())
