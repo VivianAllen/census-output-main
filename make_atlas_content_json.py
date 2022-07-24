@@ -46,11 +46,11 @@ VAR_HYPERLINK_COLUMN = "2021 Mnemonic (variable)"
 CLASSIFICATIONS_TO_INCLUDE_COLUMN = "Classifications to keep"
 
 # The column name (assumed to be first row) that defines the default classification to be used for each variable.
-DEFAULT_CLASS_COLUMN = "Default classification"
+CHOROLPLETH_DEFAULT_CLASS_COLUMN = "Default classification"
 
 # The column name (assumed to be first row) that defines the classification for each variable that can be represented
 # as a dot density map
-DOT_DENSITY_CLASS_COLUMN = "Dot density classification"
+DOT_DENSITY_DEFAULT_CLASS_COLUMN = "Dot density classification"
 
 # The column name (assumed to be first row) that flags if this variable has comparison data from the previus 2011 census
 COMPARISON_2011_COLUMN = "2011 comparability?"
@@ -59,15 +59,28 @@ COMPARISON_2011_COLUMN = "2011 comparability?"
 NOT_DATA = ("return to index", "does not apply", "no code required")
 
 
-# ================================================= OUTPUT CLASSES =================================================== #
+# ==================================================== CLASSES ======================================================= #
+
+
+@dataclass
+class ConfigRow:
+    """All needed config values from a row from the config page of the input workbook (e.g INDEX-fitered)"""
+    topic: str
+    variable: Cell
+    classifications: str
+    chorolpleth_default_classification: str
+    dot_density_default_classification: str
+        
 
 @dataclass
 class CensusCategory:
+    """A category as found in content.json."""
     name: str
     slug: str
     code: str
 
-    def to_json(self):
+    def to_jsonable(self):
+        """Category in json-friendly form."""
         return {
             "name": self.name,
             "slug": self.slug,
@@ -77,14 +90,16 @@ class CensusCategory:
 
 @dataclass
 class CensusClassification:
+    """A classification as found in content.json."""
     code: str
     slug: str
     desc: str
-    chorolpleth_default: bool
-    dot_density_default: bool
-    categories: list[CensusCategory]
+    chorolpleth_default: bool = False
+    dot_density_default: bool = False
+    categories: list[CensusCategory] = []
 
-    def to_json(self):
+    def to_jsonable(self):
+        """Classification json-friendly form w. optional properties."""
         output_params = {
             "code": self.code,
             "slug": self.slug,
@@ -94,68 +109,95 @@ class CensusClassification:
             output_params["chorolpleth_default"] = self.chorolpleth_default
         if self.dot_density_default:
             output_params["dot_density_default"] = self.dot_density_default
-        output_params["categories"] = [c.to_json() for c in self.categories]
+        output_params["categories"] = [c.to_jsonable() for c in self.categories]
         return output_params
 
 
 @dataclass
 class CensusVariable:
+    """A variable as found in content.json."""
     name: str
     code: str
     slug: str
     desc: str
     units: str
-    classifications: list[CensusClassification]
+    classifications: list[CensusClassification] = []
 
-    def to_json(self):
+    def to_jsonable(self):
+        """Variable in json-friendly form."""
         return {
             "name": self.name,
             "code": self.code,
             "slug": self.slug,
             "desc": self.desc,
             "units": self.units,
-            "classifications": [c.to_json() for c in self.classifications]
+            "classifications": [c.to_jsonable() for c in self.classifications]
         }
 
 
 @dataclass
 class CensusTopic:
+    """A topic as found in content.json."""
     name: str
     slug: str
     desc: str
-    variables: list[CensusVariable]
+    variables: list[CensusVariable] = []
 
-    def to_json(self):
+    def to_jsonable(self):
+        """Topic in json-friendly form."""
         return {
             "name": self.name,
             "slug": self.slug,
             "desc": self.desc,
-            "variables": [v.to_json() for v in self.variables]
+            "variables": [v.to_jsonable() for v in self.variables]
         }
 
 @dataclass
 class AllTopics:
+    """A list of topics as found in content.json"""
     topics: list[CensusTopic]
 
-    def to_json(self):
-        # NB topics in alphabetical order!
-        return [t.to_json() for t in sorted(self.topics, key = lambda x: x.name)]
+    def to_jsonable(self):
+        """Topic list in json-friendly form, with topics sorted alphabetically.."""
+        return [t.to_jsonable() for t in sorted(self.topics, key = lambda x: x.name)]
 
 
 # ==================================================== UTILITIES ===================================================== #
 
 
+def load_config_rows_from_config_sheet(wb: Workbook) -> list[ConfigRow]:
+    """
+    To load_config_rows_from_config_sheet, first use the columns headers in the first row to convert all subsequent rows
+    to dictionaries, then use row_dicts to create to list of ConfigRows. NB blank rows will be ignored.
+    """
+    rows = wb[CONFIG_WORKSHEET].rows
+    header_row = next(rows)
+    colnames = [cell.value for cell in header_row]
+    row_dicts = [dict(zip(colnames, row)) for row in rows if not all(c.value == None for c in row)]
+    config_rows = []
+    for row_dict in row_dicts:
+        config_rows.append(
+            ConfigRow(
+                topic = row_dict[TOPIC_NAME_COLUMN].value,
+                variable = row_dict[VAR_HYPERLINK_COLUMN],
+                classifications = row_dict[CLASSIFICATIONS_TO_INCLUDE_COLUMN],
+                chorolpleth_default_classification = row_dict[CHOROLPLETH_DEFAULT_CLASS_COLUMN],
+                dot_density_default_classification = row_dict[DOT_DENSITY_DEFAULT_CLASS_COLUMN]
+            )
+        )
+    return config_rows
+    
+
+def load_topic_defin
+
+
 def cmp_strings(string1: str, string2: str) -> bool:
-    """
-    Return True if normalised strings are equal.
-    """
+    """Return True if normalised strings are equal."""
     return string1.lower().strip() == string2.lower().strip()
 
 
 def cmp_string_to_list(string1: str, strList: str) -> bool:
-    """
-    Return True if normalised string1 is equal to any normalised string in strList.
-    """
+    """Return True if normalised string1 is equal to any normalised string in strList."""
     return any(cmp_strings(string1, string2) for string2 in strList)
 
 
@@ -196,32 +238,23 @@ def load_metadata() -> dict:
 
 
 def worksheet_to_row_dicts(ws: Worksheet) -> list[dict]:
-    """
-    Convert worksheet to list of dictionaries keyed with the values found in the first row of cells.
-    """
-    rows = ws.rows
-    header_row = next(rows)
-    colnames = [cell.value for cell in header_row]
-    return [dict(zip(colnames, row)) for row in rows if not all(c.value == None for c in row)]
+    
 
 
 # ================================================= TOPIC PROCESSING ================================================= #
 
 
-def get_topics(wb: Workbook, metadata: dict) -> AllTopics:
+def get_topics(wb: Workbook, config_rows: list[ConfigRow], metadata: dict) -> AllTopics:
     """
-    To parse the topics from the wb workbook, first simplify procesing by converting the config worksheet (named in the 
-    CONFIG_WORKSHEET constant) to a list of dictionaries keyed to the column headers found in the first row. Then loop 
-    through the remaining rows and first get_topic_metadata for each topic name found in the TOPIC_NAME_COLUMN (rows 
+    To parse the topics from the wb workbook, first loop through the ConfigRows (which define which topics, variables
+    and classifications are to be processed) and first get_topic_metadata for each topic name found in the TOPIC_NAME_COLUMN (rows 
     with no value in this column will be ignored), then get_variable for each row.
 
     NB - topics and variables are defined in the same rows on the config worksheet, so the same topic will be processed
     multiple times. Only the first defintion of the topic will be saved.
     """
-    config_rows = worksheet_to_row_dicts(wb[CONFIG_WORKSHEET])
     topics = []
     for cr in config_rows:
-
         # the config sheet seems to refer to topics by either name, mnemonic or title...
         name_mnemonic_or_title = cr[TOPIC_NAME_COLUMN].value
         if name_mnemonic_or_title is None:
@@ -288,7 +321,6 @@ def get_variable(wb: Workbook, config_row: dict, metadata: dict) -> CensusVariab
     could not be found), then get_variable_metadata for the variables code, then finally get_classifications from the 
     worksheet for the variable.
     """
-
     var_code = get_variable_code(config_row)
     if var_code is None:
         return
@@ -424,8 +456,8 @@ def get_classification_metadata(code: str, metadata: dict) -> dict:
 
 
 def get_classification_visualisation_flags(code: str, config_row: dict) -> dict:
-    default_class_suffix = config_row[DEFAULT_CLASS_COLUMN].value.replace("(only one classification)", "").strip()
-    dot_density_class_suffix = config_row[DOT_DENSITY_CLASS_COLUMN].value.strip()
+    default_class_suffix = config_row[CHOROLPLETH_DEFAULT_CLASS_COLUMN].value.replace("(only one classification)", "").strip()
+    dot_density_class_suffix = config_row[DOT_DENSITY_DEFAULT_CLASS_COLUMN].value.strip()
     return {
         "chorolpleth_default": code.endswith(default_class_suffix),
         "dot_density_default": dot_density_class_suffix.lower() != "no" and code.endswith(dot_density_class_suffix)
@@ -499,10 +531,11 @@ def main():
     workbook_filename = sys.argv[1]
     output_filename = sys.argv[2]
     wb = load_workbook(workbook_filename)
-    metadata = load_metadata()
-    topics = get_topics(wb, metadata)
-    with open(output_filename, "w") as f:
-        json.dump(topics.to_json(), f, indent=4)
+    config_rows = load_config_rows_from_config_sheet(wb)
+    # metadata = load_metadata()
+    # topics = get_topics(wb, config_rows, metadata)
+    # with open(output_filename, "w") as f:
+    #     json.dump(topics.to_jsonable(), f, indent=4)
 
 
 if __name__ == "__main__":
